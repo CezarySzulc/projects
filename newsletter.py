@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 
 from sklearn import __version__ as sk_version
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import Imputer, RobustScaler, StandardScaler
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.tree import DecisionTreeClassifier
@@ -62,7 +62,7 @@ def download_data(file):
     
     
 def create_pipeline(classifier):
-    imp = Imputer(missing_values=0, strategy="median", axis=0)
+    imp = Imputer(missing_values=0, strategy="mean", axis=0)
     var_thr = VarianceThreshold(threshold=1)
     scaler = RobustScaler()
     clf = classifier
@@ -71,6 +71,7 @@ def create_pipeline(classifier):
                            ('var_thr', var_thr),
                            ('scaler', scaler),
                            ('clf', clf)])
+
 
 def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
     clf.fit_transform(x_train, y_train)
@@ -82,12 +83,22 @@ def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
     print(confusion_matrix(y_test, predict))
 
 
+def fit_and_grid_model(clf, params, x_train, y_train):
+    search_func = GridSearchCV(estimator=clf, param_grid=params, n_jobs=-1)
+    search_func.fit(x_train, y_train)
+    print('#'*70 + '\nRAPORT\n' + '#'*70)
+    print('best params: {}'.format(search_func.best_params_))
+    print('best score: {}'.format(search_func.best_score_))
+    
+
 if __name__ == '__main__':
     check_library_version()
     x_train, x_test, y_train, y_test = download_data(FILE_NAME)
     # score test result: 0.7806977797915723
     #clf = DecisionTreeClassifier()
-    # score test result: 0.8258571212807733
-    clf = RandomForestClassifier()
+    # score test result: 0.8309167799426068
+    clf = RandomForestClassifier(n_estimators=30, n_jobs=-1, random_state=43)
+    params = {'clf__n_estimators': np.arange(5,50)}
     pipeline = create_pipeline(clf)
-    fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
+    fit_and_grid_model(pipeline, params, x_train, y_train)
+    #fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
