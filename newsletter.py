@@ -7,13 +7,19 @@ Created on Fri Oct 27 16:28:39 2017
 
 
 import pandas as pd
+import numpy as np
+
 from sklearn import __version__ as sk_version
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import Imputer, RobustScaler
+from sklearn.preprocessing import Imputer, RobustScaler, StandardScaler
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix
+
+from matplotlib import __version__ as plt_version
+import matplotlib.pyplot as plt
 
 
 FILE_NAME = 'data_set.csv'
@@ -23,14 +29,23 @@ def check_library_version():
         print('pandas version: OK')
     else:
         print('pandas version: WRONG \n\tcorrect version -> 0.18.1')
+    if np.__version__ == '1.13.1':
+        print('numpy version: OK')
+    else:
+        print('numpy version: WRONG \n\tcorrect version ->1.13.1')
     if sk_version == '0.18.2':
         print('sklearn version: OK')
     else:
         print('sklearn version: WRONG \n\tcorrect version -> 0.18.2')
+    if plt_version == '1.5.1':
+        print('matplotlib version: OK')
+    else:
+        print('matplotlib version: WRONG \n\tcorrect version -> 1.5.1')
 
 
 def download_data(file):
     df = pd.read_csv(file, index_col='us_id')
+    #df.dropna(inplace=True)
     # create target series
     target = df['target']
     # deleate tearget from data set
@@ -38,20 +53,25 @@ def download_data(file):
     # mapping variables to intiger values
     df.sex = df.sex.map({'M':0, 'F':1})
     # create training and test sets
-    return train_test_split(df, target, test_size=0.2)
     
-def create_pipeline():
+    #global corr
+    #corr = np.abs((np.corrcoef(df.T)))
+    #import pdb; pdb.set_trace()
+    
+    return train_test_split(df, target, test_size=0.2, random_state=43)
+    
+    
+def create_pipeline(classifier):
     imp = Imputer(missing_values=0, strategy="median", axis=0)
     var_thr = VarianceThreshold(threshold=1)
     scaler = RobustScaler()
-    clf = DecisionTreeClassifier()
-
+    clf = classifier
+    
     return Pipeline(steps=[('imp', imp),
                            ('var_thr', var_thr),
                            ('scaler', scaler),
                            ('clf', clf)])
-                           
-                           
+
 def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
     clf.fit_transform(x_train, y_train)
     predict = clf.predict(x_test)
@@ -65,5 +85,9 @@ def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
 if __name__ == '__main__':
     check_library_version()
     x_train, x_test, y_train, y_test = download_data(FILE_NAME)
-    pipeline = create_pipeline()
+    # score test result: 0.7806977797915723
+    #clf = DecisionTreeClassifier()
+    # score test result: 0.8258571212807733
+    clf = RandomForestClassifier()
+    pipeline = create_pipeline(clf)
     fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
