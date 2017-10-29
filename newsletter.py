@@ -12,8 +12,10 @@ import numpy as np
 from sklearn import __version__ as sk_version
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import Imputer, RobustScaler, StandardScaler
-from sklearn.feature_selection import VarianceThreshold
+from sklearn.feature_selection import VarianceThreshold, RFECV
+from sklearn.decomposition import RandomizedPCA
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix
@@ -64,17 +66,19 @@ def download_data(file):
 def create_pipeline(classifier):
     imp = Imputer(missing_values=0, strategy="mean", axis=0)
     var_thr = VarianceThreshold(threshold=1)
+    pca = RandomizedPCA(n_components=100)
     scaler = RobustScaler()
     clf = classifier
     
     return Pipeline(steps=[('imp', imp),
                            ('var_thr', var_thr),
+                           ('pca', pca),
                            ('scaler', scaler),
                            ('clf', clf)])
 
 
 def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
-    clf.fit_transform(x_train, y_train)
+    clf.fit(x_train, y_train)
     predict = clf.predict(x_test)
     print('#'*70 + '\nRAPORT\n' + '#'*70)
     print('score train result: {}'.format(clf.score(x_train, y_train)))
@@ -90,6 +94,19 @@ def fit_and_grid_model(clf, params, x_train, y_train):
     print('best params: {}'.format(search_func.best_params_))
     print('best score: {}'.format(search_func.best_score_))
     
+def recruitment_elimination(clf, x_train, y_train, x_test, y_test):
+    
+    imp = Imputer(missing_values=0, strategy="median", axis=0)
+    x_train = imp.fit_transform(x_train)
+    x_test = imp.transform(x_test)
+
+    selector = RFECV(estimator=clf)
+    selector.fit(x_train, y_train)
+    print('select features: {}'.format(selector.n_features_))
+    x_train_s = selector.transform(x_train)
+    x_test_s = selector.transform(x_test)
+    fit_and_test_model(clf, x_test_s, y_test, x_train_s, y_train)
+
 
 if __name__ == '__main__':
     check_library_version()
@@ -97,8 +114,11 @@ if __name__ == '__main__':
     # score test result: 0.7806977797915723
     #clf = DecisionTreeClassifier()
     # score test result: 0.8309167799426068
-    clf = RandomForestClassifier(n_estimators=30, n_jobs=-1, random_state=43)
-    params = {'clf__n_estimators': np.arange(5,50)}
+    #clf = RandomForestClassifier(n_estimators=47, n_jobs=-1, random_state=43)
+    # 0.8385440265820873
+    clf = LogisticRegression()
+    #params = {'clf__n_neighborss': np.arange(1,50)}
     pipeline = create_pipeline(clf)
-    fit_and_grid_model(pipeline, params, x_train, y_train)
-    #fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
+    #fit_and_grid_model(pipeline, params, x_train, y_train)
+    fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
+    #recruitment_elimination(clf, x_train, y_train, x_test, y_test)
