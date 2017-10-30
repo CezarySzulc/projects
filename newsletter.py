@@ -16,7 +16,10 @@ from sklearn.feature_selection import VarianceThreshold, RFECV
 from sklearn.decomposition import RandomizedPCA
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier, GradientBoostingClassifier
+)
+from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix
 
@@ -47,7 +50,6 @@ def check_library_version():
 
 def download_data(file):
     df = pd.read_csv(file, index_col='us_id')
-    #df.dropna(inplace=True)
     # create target series
     target = df['target']
     # deleate tearget from data set
@@ -59,32 +61,39 @@ def download_data(file):
     #global corr
     #corr = np.abs((np.corrcoef(df.T)))
     #import pdb; pdb.set_trace()
-    
-    return train_test_split(df, target, test_size=0.2, random_state=43)
+    x_train, x_test, y_train, y_test = train_test_split(
+        df, target, test_size=0.2, random_state=43
+    )
+    positive = y_train[y_train==1]
+    import pdb; pdb.set_trace()
+    return x_train, x_test, y_train, y_test
     
     
 def create_pipeline(classifier):
-    imp = Imputer(missing_values=0, strategy="mean", axis=0)
-    var_thr = VarianceThreshold(threshold=1)
-    pca = RandomizedPCA(n_components=100)
+    imp = Imputer(strategy="mean", axis=0)
+    var_thr = VarianceThreshold(threshold=1.8)
+    pca = RandomizedPCA(n_components=34)
     scaler = RobustScaler()
-    clf = classifier
     
     return Pipeline(steps=[('imp', imp),
                            ('var_thr', var_thr),
                            ('pca', pca),
                            ('scaler', scaler),
-                           ('clf', clf)])
+                           ('clf', classifier)
+    ])
 
 
 def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
     clf.fit(x_train, y_train)
-    predict = clf.predict(x_test)
+    predict_train = clf.predict(x_train)
+    predict_test = clf.predict(x_test)
     print('#'*70 + '\nRAPORT\n' + '#'*70)
-    print('score train result: {}'.format(clf.score(x_train, y_train)))
-    print('score test result: {}'.format(clf.score(x_test, y_test)))
-    print(classification_report(y_test, predict))
-    print(confusion_matrix(y_test, predict))
+    print('\nscore train result: {}'.format(clf.score(x_train, y_train)))
+    print(classification_report(y_train, predict_train))
+    print(confusion_matrix(y_train, predict_train))
+    print('\nscore test result: {}'.format(clf.score(x_test, y_test)))
+    print(classification_report(y_test, predict_test))
+    print(confusion_matrix(y_test, predict_test))
 
 
 def fit_and_grid_model(clf, params, x_train, y_train):
@@ -113,11 +122,21 @@ if __name__ == '__main__':
     x_train, x_test, y_train, y_test = download_data(FILE_NAME)
     # score test result: 0.7806977797915723
     #clf = DecisionTreeClassifier()
-    # score test result: 0.8309167799426068
-    #clf = RandomForestClassifier(n_estimators=47, n_jobs=-1, random_state=43)
+    # score test result: 0.8309167799426068 recall: 0.05
+    #clf = RandomForestClassifier(n_estimators=47, n_jobs=-1, random_state=1)
+    # score test result: 0.8080350400241655 recall: 0.12
+    clf = ExtraTreesClassifier(
+        n_estimators=5, n_jobs=-1, random_state=1,  class_weight={0:.1, 1:.8}
+    )
+    # score test result: 0.8389971303428485  recall: 0.01!
+    #clf = AdaBoostClassifier(n_estimators=5)
+    # score test result: 0.8383929919951669 recall: 0.00!
+    #clf = GradientBoostingClassifier(n_estimators=20, learning_rate=0.5)
+    
+    # clf = SVC()
     # 0.8385440265820873
-    clf = LogisticRegression()
-    #params = {'clf__n_neighborss': np.arange(1,50)}
+    #clf = LogisticRegression()
+    #params = {'pca__n_components': np.arange(1, 150, 1)}
     pipeline = create_pipeline(clf)
     #fit_and_grid_model(pipeline, params, x_train, y_train)
     fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
