@@ -57,15 +57,16 @@ def download_data(file):
     # mapping variables to intiger values
     df.sex = df.sex.map({'M':0, 'F':1})
     # create training and test sets
-    
-    #global corr
-    #corr = np.abs((np.corrcoef(df.T)))
-    #import pdb; pdb.set_trace()
     x_train, x_test, y_train, y_test = train_test_split(
         df, target, test_size=0.2, random_state=43
     )
-    positive = y_train[y_train==1]
-    import pdb; pdb.set_trace()
+    for index in y_train[y_train==1]._index:
+        a = x_train[x_train.index == index]
+        b = y_train[y_train.index == index]
+        for _ in range(6):
+            x_train = x_train.append(a)
+            y_train =   y_train.append(b)
+
     return x_train, x_test, y_train, y_test
     
     
