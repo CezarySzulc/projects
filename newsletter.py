@@ -57,18 +57,18 @@ def download_data(file):
     # mapping variables to intiger values
     df.sex = df.sex.map({'M':0, 'F':1})
     # create training and test sets
-    x_train, x_test, y_train, y_test = train_test_split(
-        df, target, test_size=0.2, random_state=43
-    )
-    
-    # multiple training set
-    series = y_train[y_train==1]
+    return train_test_split(df, target, test_size=0.2, random_state=43)
+
+
+def multiple_traning_set(x_train, y_train, target, times):
+    ''' multiple training set, times difine how many times a data will be append to set '''
+    series = y_train[y_train==target]
     dupli = x_train.loc[series.index.tolist(), :]
-    for _ in range(6):
+    for _ in range(times):
         x_train = x_train.append(dupli)
         y_train = y_train.append(series)
     
-    return x_train, x_test, y_train, y_test
+    return x_train, y_train
 
 
 def create_pipeline(classifier):
@@ -106,7 +106,8 @@ def fit_and_grid_model(clf, params, x_train, y_train):
     print('#'*70 + '\nRAPORT\n' + '#'*70)
     print('best params: {}'.format(search_func.best_params_))
     print('best score: {}'.format(search_func.best_score_))
-    
+
+
 def recruitment_elimination(clf, x_train, y_train, x_test, y_test):
     
     imp = Imputer(missing_values=0, strategy="median", axis=0)
@@ -131,7 +132,7 @@ if __name__ == '__main__':
     # score test result: 0.8080350400241655 recall: 0.12
     
     clf = ExtraTreesClassifier(
-        n_estimators=500, max_features=0.5, max_depth=10,
+        n_estimators=100, max_features=0.5, max_depth=10,
         n_jobs=-1, random_state=1,  class_weight={0:.1, 1:.5}
     )
     
