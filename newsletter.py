@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 
 from sklearn import __version__ as sk_version
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.preprocessing import Imputer, RobustScaler, StandardScaler
 from sklearn.feature_selection import VarianceThreshold, RFECV
 from sklearn.decomposition import RandomizedPCA
@@ -19,7 +19,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import (
     RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier, GradientBoostingClassifier
 )
-from sklearn.svm import SVC
+from sklearn.svm import OneClassSVM
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix
 
@@ -60,16 +60,17 @@ def download_data(file):
     x_train, x_test, y_train, y_test = train_test_split(
         df, target, test_size=0.2, random_state=43
     )
-    for index in y_train[y_train==1]._index:
-        a = x_train[x_train.index == index]
-        b = y_train[y_train.index == index]
-        for _ in range(6):
-            x_train = x_train.append(a)
-            y_train =   y_train.append(b)
-
+    
+    # multiple training set
+    series = y_train[y_train==1]
+    dupli = x_train.loc[series.index.tolist(), :]
+    for _ in range(6):
+        x_train = x_train.append(dupli)
+        y_train = y_train.append(series)
+    
     return x_train, x_test, y_train, y_test
-    
-    
+
+
 def create_pipeline(classifier):
     imp = Imputer(strategy="mean", axis=0)
     var_thr = VarianceThreshold(threshold=1.8)
@@ -85,6 +86,8 @@ def create_pipeline(classifier):
 
 
 def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
+    cross = cross_val_score(clf, x_train, y_train)
+    print(cross)
     clf.fit(x_train, y_train)
     predict_train = clf.predict(x_train)
     predict_test = clf.predict(x_test)
@@ -126,18 +129,26 @@ if __name__ == '__main__':
     # score test result: 0.8309167799426068 recall: 0.05
     #clf = RandomForestClassifier(n_estimators=47, n_jobs=-1, random_state=1)
     # score test result: 0.8080350400241655 recall: 0.12
+    
     clf = ExtraTreesClassifier(
-        n_estimators=5, n_jobs=-1, random_state=1,  class_weight={0:.1, 1:.8}
+        n_estimators=500, max_features=0.5, max_depth=10,
+        n_jobs=-1, random_state=1,  class_weight={0:.1, 1:.5}
     )
+    
     # score test result: 0.8389971303428485  recall: 0.01!
     #clf = AdaBoostClassifier(n_estimators=5)
     # score test result: 0.8383929919951669 recall: 0.00!
     #clf = GradientBoostingClassifier(n_estimators=20, learning_rate=0.5)
     
-    # clf = SVC()
+    #clf = OneClassSVM(kernel='sigmoid')
     # 0.8385440265820873
     #clf = LogisticRegression()
-    #params = {'pca__n_components': np.arange(1, 150, 1)}
+    '''
+    params = {'clf__n_estimators': np.arange(100, 1000, 10),
+              'clf__max_features': np.arange(0.3, 0.6, 0.05), 
+              'clf__max_depth': np.arange(5, 15)
+    }
+    '''
     pipeline = create_pipeline(clf)
     #fit_and_grid_model(pipeline, params, x_train, y_train)
     fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
