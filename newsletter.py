@@ -13,9 +13,10 @@ from sklearn import __version__ as sk_version
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.preprocessing import Imputer, RobustScaler, StandardScaler
 from sklearn.feature_selection import VarianceThreshold, RFECV
+from sklearn.kernel_approximation import RBFSampler
 from sklearn.decomposition import RandomizedPCA
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.ensemble import (
     RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier, GradientBoostingClassifier
 )
@@ -72,15 +73,17 @@ def multiple_traning_set(x_train, y_train, target, times):
 
 
 def create_pipeline(classifier):
-    imp = Imputer(strategy="mean", axis=0)
-    var_thr = VarianceThreshold(threshold=1.8)
-    pca = RandomizedPCA(n_components=34)
-    scaler = RobustScaler()
+    imp = Imputer(strategy="most_frequent", axis=0)
+    var_thr = VarianceThreshold(threshold=1.7)
+    #rbf_feature = RBFSampler(gamma=1, random_state=1)
+    pca = RandomizedPCA(n_components=16)
+    #scaler = StandardScaler()
     
     return Pipeline(steps=[('imp', imp),
                            ('var_thr', var_thr),
                            ('pca', pca),
-                           ('scaler', scaler),
+                           #('scaler', scaler),
+                           #('rbf_feature', rbf_feature),
                            ('clf', classifier)
     ])
 
@@ -122,20 +125,37 @@ def recruitment_elimination(clf, x_train, y_train, x_test, y_test):
     fit_and_test_model(clf, x_test_s, y_test, x_train_s, y_train)
 
 
+def union_estimators(last_estimator, x_train, y_train, x_test, y_test, *estimators):
+    df = pd.DataFrame()
+    for index, est in enumerate(estimators):
+        est.fit(x_train, y_train)
+        predict = est.predict_proba(x_train)
+        df[index*2+1] = predict[:,0]
+        df[index*2+2] = predict[:,1]
+    fit_and_test_model(last_estimator, x_test, y_test, df, y_train)
+    
+    
 if __name__ == '__main__':
     check_library_version()
     x_train, x_test, y_train, y_test = download_data(FILE_NAME)
+    x_train, y_train = multiple_traning_set(x_train, y_train, 1, 2)
     # score test result: 0.7806977797915723
-    #clf = DecisionTreeClassifier()
+    clf = DecisionTreeClassifier(max_features=0.86, max_depth=42)
     # score test result: 0.8309167799426068 recall: 0.05
-    #clf = RandomForestClassifier(n_estimators=47, n_jobs=-1, random_state=1)
+    
+    clf1 = RandomForestClassifier(
+        n_estimators=47, n_jobs=-1, max_features=0.5, max_depth=10, 
+        random_state=1, class_weight={0:.1, 1:.5}
+    )
     # score test result: 0.8080350400241655 recall: 0.12
     
-    clf = ExtraTreesClassifier(
-        n_estimators=100, max_features=0.5, max_depth=10,
-        n_jobs=-1, random_state=1,  class_weight={0:.1, 1:.5}
+    
+    clf2 = ExtraTreesClassifier(
+        n_estimators=50, max_features=0.3, max_depth=50,
+        n_jobs=-1, random_state=1, class_weight={0:.1, 1:.2}
     )
     
+    #clf = SGDClassifier(loss="hinge", penalty="l2", shuffle=True)
     # score test result: 0.8389971303428485  recall: 0.01!
     #clf = AdaBoostClassifier(n_estimators=5)
     # score test result: 0.8383929919951669 recall: 0.00!
@@ -144,13 +164,15 @@ if __name__ == '__main__':
     #clf = OneClassSVM(kernel='sigmoid')
     # 0.8385440265820873
     #clf = LogisticRegression()
-    '''
-    params = {'clf__n_estimators': np.arange(100, 1000, 10),
-              'clf__max_features': np.arange(0.3, 0.6, 0.05), 
-              'clf__max_depth': np.arange(5, 15)
+    params = {
+        'clf__min_samples_leaf': np.arange(1, 100),
+        #'pca__n_components': np.arange(2, 75),
+        #'var_thr__threshold': np.arange(0.1, 3, 0.1)
     }
-    '''
+
     pipeline = create_pipeline(clf)
+    pipeline1 = create_pipeline(clf1)
     #fit_and_grid_model(pipeline, params, x_train, y_train)
-    fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
+    #fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
     #recruitment_elimination(clf, x_train, y_train, x_test, y_test)
+    union_estimators(clf2, x_train, y_train, x_test, y_test, pipeline, pipeline1)
