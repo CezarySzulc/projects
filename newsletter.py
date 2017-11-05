@@ -111,6 +111,8 @@ def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
     print('\nscore test result: {}'.format(clf.score(x_test, y_test)))
     print(classification_report(y_test, predict_test))
     print(confusion_matrix(y_test, predict_test))
+    
+    return clf
 
 
 def fit_and_grid_model(clf, params, x_train, y_train):
@@ -151,7 +153,7 @@ def union_estimators(last_estimator, x_train, y_train, x_test, y_test, *estimato
     print(classification_report(y_train, predict_train))
     print(confusion_matrix(y_train, predict_train))
     test_union_estimators(last_estimator, x_test, y_test, clf_list)
-    
+
 
 def test_union_estimators(last_estimator, x_test, y_test, clf_list):
     df = pd.DataFrame()
@@ -164,6 +166,13 @@ def test_union_estimators(last_estimator, x_test, y_test, clf_list):
     print('\nscore test result: {}'.format(last_estimator.score(df, y_test)))
     print(classification_report(y_test, predict_test))
     print(confusion_matrix(y_test, predict_test))
+
+
+def prepare_raport(clf, x_test, y_test):
+    result = [(index, predict[index]) for predict, index in zip(clf.predict_proba(x_test), y_test)]
+    df_result = pd.DataFrame(data=result, index=y_test.index, columns=['target', 'target_score'])
+    df_result.to_csv(path_or_buf='submmision_form.csv', sep=',')
+
     
 if __name__ == '__main__':
     check_library_version()
@@ -175,4 +184,5 @@ if __name__ == '__main__':
         random_state=1
     )
 
-    fit_and_test_model(create_pipeline(clf), x_test, y_test, x_train, y_train)
+    clf = fit_and_test_model(create_pipeline(clf), x_test, y_test, x_train, y_train)
+    prepare_raport(clf, x_test, y_test)
