@@ -22,6 +22,7 @@ from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.ensemble import (
     RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier, GradientBoostingClassifier
 )
+from sklearn.neural_network import MLPClassifier
 from sklearn.svm import OneClassSVM
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix
@@ -60,20 +61,7 @@ def download_data(file):
     # mapping variables to intiger values
     df.sex = df.sex.map({'M':0, 'F':1})
     # create training and test sets
-    
-    data_set = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=0)
-    df.reset_index(inplace=True, drop=True)
-    target = target.reset_index(drop=True)
-    for train_index, test_index in data_set.split(df, target):
-        x_train, x_test, y_train, y_test =  df.loc[train_index.tolist()],  df.loc[test_index.tolist()], target[train_index.tolist()], target[test_index.tolist()]
-        '''
-        x_train.set_index('us_id', inplace=True)
-        x_test.set_index('us_id', inplace=True)
-        y_train.set_index('us_id', inplace=True) 
-        y_test.set_index('us_id', inplace=True)
-        '''
-        yield x_train, x_test, y_train, y_test
-    #return train_test_split(df, target, test_size=0.2, random_state=43)
+    return train_test_split(df, target, test_size=0.2, random_state=43)
 
 
 def multiple_traning_set(x_train, y_train, target, times):
@@ -91,16 +79,23 @@ def create_pipeline(classifier):
     imp = Imputer(strategy="most_frequent", axis=0)
     var_thr = VarianceThreshold(threshold=1.7)
     #rbf_feature = RBFSampler(gamma=1, random_state=1)
-    pca = PCA(n_components=16)
+    #pca = PCA(n_components=16)
     #scaler = StandardScaler()
-    
+
     return Pipeline(steps=[('imp', imp),
                            ('var_thr', var_thr),
-                           ('pca', pca),
+                           #('pca', pca),
                            #('scaler', scaler),
                            #('rbf_feature', rbf_feature),
                            ('clf', classifier)
     ])
+
+
+def plot_scatter(data, target):
+    colors_palette = {0: 'yellow', 1: 'black'}
+    colors = [colors_palette[x] for x in target]
+    data = pd.DataFrame(data)
+    pd.tools.plotting.scatter_matrix(data, alpha=0.2, color=colors)
 
 
 def fit_and_test_model(clf, x_test, y_test, x_train, y_train):
@@ -172,52 +167,12 @@ def test_union_estimators(last_estimator, x_test, y_test, clf_list):
     
 if __name__ == '__main__':
     check_library_version()
-    for data in download_data(FILE_NAME):
-        x_train, x_test, y_train, y_test = data
-        # x_train, y_train = multiple_traning_set(x_train, y_train, 1, 4)
-        # score test result: 0.7806977797915723
-        clf = DecisionTreeClassifier(max_features=0.86, max_depth=42)
-        # score test result: 0.8309167799426068 recall: 0.05
-        
-        clf2 = RandomForestClassifier(
-            n_estimators=47, n_jobs=-1, max_features=0.5, max_depth=10, 
-            random_state=1, class_weight={0:.001, 1:.08}
-        )
-        # score test result: 0.8080350400241655 recall: 0.12
-        
-        
-        clf1 = ExtraTreesClassifier(
-            n_estimators=50, max_features=0.3, max_depth=50,
-            n_jobs=-1, random_state=1, class_weight={0:.05, 1:.1}
-        )
-        
-        #clf = SGDClassifier(loss="hinge", penalty="l2", shuffle=True)
-        # score test result: 0.8389971303428485  recall: 0.01!
-        clf4 = AdaBoostClassifier(n_estimators=5)
-        # score test result: 0.8383929919951669 recall: 0.00!
-        clf3 = GradientBoostingClassifier(n_estimators=20, learning_rate=0.5)
-        
-        #clf6 = OneClassSVM(kernel='sigmoid')
-        # 0.8385440265820873
-        #clf7 = LogisticRegression()
-        params = {
-            'clf__min_samples_leaf': np.arange(1, 100),
-            #'pca__n_components': np.arange(2, 75),
-            #'var_thr__threshold': np.arange(0.1, 3, 0.1)
-        }
+    x_train, x_test, y_train, y_test = download_data(FILE_NAME)
+    x_train, y_train = multiple_traning_set(x_train, y_train, 1, 4)
     
-        pipeline = create_pipeline(clf)
-        pipeline1 = create_pipeline(clf1)
-        '''
-        pipeline2 = create_pipeline(clf2)
-        pipeline3 = create_pipeline(clf3)
-        pipeline4 = create_pipeline(clf4)
-        '''
-        #fit_and_grid_model(pipeline, params, x_train, y_train)
-        fit_and_test_model(pipeline, x_test, y_test, x_train, y_train)
-        #recruitment_elimination(clf, x_train, y_train, x_test, y_test)
-        '''
-        union_estimators(clf2, x_train, y_train, x_test, y_test, 
-                         pipeline, pipeline1
-        )
-        '''
+    clf = RandomForestClassifier(
+        n_estimators=500, n_jobs=-1, max_features=0.5, max_depth=15, 
+        random_state=1
+    )
+
+    fit_and_test_model(create_pipeline(clf), x_test, y_test, x_train, y_train)
